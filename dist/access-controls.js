@@ -54,7 +54,43 @@ function AccessControlList(conf) {
 
   this._conditions = conf.conditions || []
 
+  if (conf.inherit) {
+    this._inherit = conf.inherit
+  }
+
   this._objectParser = new OTParser()
+}
+
+AccessControlList.prototype.shouldApplyInherited = function(obj, action, roles, context) {
+  var inheritApply = {
+    ok: true
+  }
+  var self = this
+  if (self._inherit && context.inherit$) {
+    var skip = _.any(self._inherit.allow, function(allow) {
+      var rolesMatch = self._rolesMatch(allow.roles, roles)
+      if (rolesMatch.ok) {
+        var entityMatch = _.findWhere(allow.entities, context.inherit$.entityDef)
+        if (entityMatch) {
+          return _.all(allow.conditions, function(condition) {
+            var match = self._conditionMatch(condition, context.inherit$.entity, action, context)
+            return (match.ok === true)
+          })
+        }
+        else {
+          return false
+        }
+      }
+      else {
+        return false
+      }
+    })
+    if (skip) {
+      inheritApply.ok = false
+      inheritApply.reason = 'inherit pass through'
+    }
+  }
+  return inheritApply
 }
 
 AccessControlList.prototype.shouldApply = function(obj, action) {
@@ -107,7 +143,18 @@ AccessControlList.prototype._conditionsMatch = function(obj, action, context) {
 }
 
 AccessControlList.prototype._filter = function(obj) {
+  var self = this
   if(this._filters) {
+    var invertedFilters = _.pick(this._filters, function(filter) {return filter === true})
+    /*foo: true => all attributes denied except for foo and ones ending with $. Can't be mixed
+     with other filters*/
+    if(!_.isEmpty(invertedFilters)) {
+      this._filters = {}
+      _.forOwn(obj, function (value, key) {
+        if (_.last(key) !== '$' && !_.has(invertedFilters, key))
+          self._filters[key] = false;
+      });
+    }
     var filters = []
     for(var attr in this._filters) {
       var filter = this._applyFilter(this._filters[attr], obj, attr)
@@ -619,7 +666,14 @@ AccessControlProcedure.prototype._nextACL = function(obj, action, roles, accessC
 
   if(accessControls && accessControls.length > 0) {
     var accessControl = accessControls.shift()
+
     var shouldApply = accessControl.shouldApply(obj, action)
+
+    // inherited acls can be bypassed via inherit.allow on the acl definition
+    if (shouldApply.ok && context.inherit$) {
+      shouldApply = accessControl.shouldApplyInherited(obj, action, roles, context)
+    }
+
     if(shouldApply.ok) {
       //console.log('running authorization service', accessControl.name())
       accessControl.authorize(obj, action, roles, context, function(err, result) {

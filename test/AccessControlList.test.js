@@ -1089,6 +1089,45 @@ describe('access control list', function() {
       }) }) })
 
     })
+
+    it('denies access to all except inverted', function(done) {
+      var obj = {date: Date.now(), region: 'EMEA', city: 'Ottawa', dollar$: 'CAD'}
+      var acl = new AccessControlList({
+        name: 'acl4_filter',
+        roles: ['EMEA'],
+        control: 'filter',
+        actions: ['load'],
+        conditions: [{
+          attributes: {
+            'region': 'EMEA'
+          }
+        }
+        ],
+        filters: {
+          region: true, //implies that everything is false except itself
+          city: false //ignored
+        }
+      })
+      acl.authorize(obj, 'load', ['APAC'], {}, function(err, result) {
+        assert.ok(!err, err)
+        assert.ok(result)
+        assert.ok(result.authorize)
+        assert.ok(result.filters)
+        assert.equal(result.filters.length, 2)
+        assert.equal(result.filters[0].attribute, 'date')
+        assert.equal(result.filters[0].access, 'denied')
+        assert.equal(result.filters[1].attribute, 'city')
+        assert.equal(result.filters[1].access, 'denied')
+
+        acl.authorize(obj, 'load', ['EMEA'], {}, function(err, result) {
+          assert.ok(!err, err)
+          assert.ok(result)
+          assert.ok(result.authorize)
+          assert.ok(!result.filters)
+          done()
+        })
+      })
+    })
   })
 
 
