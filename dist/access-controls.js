@@ -142,26 +142,31 @@ AccessControlList.prototype._conditionsMatch = function(obj, action, context) {
   return totalMatch
 }
 
-AccessControlList.prototype._filter = function(obj) {
-  var self = this
-  if(this._filters) {
-    var invertedFilters = _.pick(this._filters, function(val) {return val === true})
-    /*foo: true => all attributes denied except for foo. Can't be mixed with other filters*/
-    if(!_.isEmpty(invertedFilters)) {
-      this._filters = {}
-      _.forOwn(obj, function (value, key) {
-        if (!_.has(invertedFilters, key))
-          self._filters[key] = false;
-      });
-    }
-    var filters = []
-    for(var attr in this._filters) {
-      var filter = this._applyFilter(this._filters[attr], obj, attr)
 
-      filters.push(filter)
-    }
-    return filters
+AccessControlList.prototype._filter = function (obj) {
+  var self = this
+  var invertedFilters = {}
+  var invertFilter = true
+  if (!_.isEmpty(this._filters)) {
+    invertedFilters = _.pick(this._filters, function (val) {return val === true})
+    invertFilter = !_.isEmpty(invertedFilters)
   }
+  if (invertFilter) {
+    this._filters = {}
+    /*foo: true => all attributes denied except for foo. Can't be mixed with other filters*/
+    _.forOwn(obj, function (value, key) {
+      if (!_.has(invertedFilters, key))
+        self._filters[key] = false;
+    });
+  }
+  var filters = []
+  for (var attr in this._filters) {
+    var filter = this._applyFilter(this._filters[attr], obj, attr)
+
+    filters.push(filter)
+  }
+
+  return filters
 
 }
 
