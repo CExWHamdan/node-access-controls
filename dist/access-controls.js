@@ -145,13 +145,12 @@ AccessControlList.prototype._conditionsMatch = function(obj, action, context) {
 AccessControlList.prototype._filter = function(obj) {
   var self = this
   if(this._filters) {
-    var invertedFilters = _.pick(this._filters, function(filter) {return filter === true})
-    /*foo: true => all attributes denied except for foo and ones ending with $. Can't be mixed
-     with other filters*/
+    var invertedFilters = _.pick(this._filters, function(val) {return val === true})
+    /*foo: true => all attributes denied except for foo. Can't be mixed with other filters*/
     if(!_.isEmpty(invertedFilters)) {
       this._filters = {}
       _.forOwn(obj, function (value, key) {
-        if (_.last(key) !== '$' && !_.has(invertedFilters, key))
+        if (!_.has(invertedFilters, key))
           self._filters[key] = false;
       });
     }

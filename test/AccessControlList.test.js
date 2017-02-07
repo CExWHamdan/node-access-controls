@@ -1090,8 +1090,8 @@ describe('access control list', function() {
 
     })
 
-    it('denies access to all except inverted', function(done) {
-      var obj = {date: Date.now(), region: 'EMEA', city: 'Ottawa', dollar$: 'CAD'}
+    it('filters all except inverted', function(done) {
+      var obj = {date: Date.now(), region: 'EMEA', city: 'Ottawa'}
       var acl = new AccessControlList({
         name: 'acl4_filter',
         roles: ['EMEA'],
@@ -1118,6 +1118,43 @@ describe('access control list', function() {
         assert.equal(result.filters[0].access, 'denied')
         assert.equal(result.filters[1].attribute, 'city')
         assert.equal(result.filters[1].access, 'denied')
+
+        acl.authorize(obj, 'load', ['EMEA'], {}, function(err, result) {
+          assert.ok(!err, err)
+          assert.ok(result)
+          assert.ok(result.authorize)
+          assert.ok(!result.filters)
+          done()
+        })
+      })
+    })
+    it('filters all', function(done) {
+      var obj = {date: Date.now(), region: 'EMEA', city: 'Ottawa'}
+      var acl = new AccessControlList({
+        name: 'acl4_filter',
+        roles: ['EMEA'],
+        control: 'filter',
+        actions: ['load'],
+        conditions: [{
+          attributes: {
+            'region': 'EMEA'
+          }
+        }
+        ],
+        filters: {} //can also be completly removed
+      })
+      acl.authorize(obj, 'load', ['APAC'], {}, function(err, result) {
+        assert.ok(!err, err)
+        assert.ok(result)
+        assert.ok(result.authorize)
+        assert.ok(result.filters)
+        assert.equal(result.filters.length, 3)
+        assert.equal(result.filters[0].attribute, 'date')
+        assert.equal(result.filters[0].access, 'denied')
+        assert.equal(result.filters[1].attribute, 'region')
+        assert.equal(result.filters[1].access, 'denied')
+        assert.equal(result.filters[2].attribute, 'city')
+        assert.equal(result.filters[2].access, 'denied')
 
         acl.authorize(obj, 'load', ['EMEA'], {}, function(err, result) {
           assert.ok(!err, err)
